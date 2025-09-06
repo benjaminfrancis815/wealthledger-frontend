@@ -8,6 +8,8 @@ import { Dialog } from 'primereact/dialog';
 import { InputNumber } from 'primereact/inputnumber';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { useEffect, useState, type FormEvent } from 'react';
+import { formatLocalDateToIsoDateString, getCurrentLocalDate } from '../utils/dateUtils';
+import { appConfig } from '../config/appConfig';
 
 interface Expense {
   id: number;
@@ -54,19 +56,19 @@ interface UpdateExpenseResponse {
 }
 
 const getAllExpenses = async (): Promise<GetAllExpensesResponse> => {
-  const response = await axios.get<GetAllExpensesResponse>('http://localhost:8080/v1/expenses');
+  const response = await axios.get<GetAllExpensesResponse>(`${appConfig.API_URL}/v1/expenses`);
   return response.data;
 };
 
 const getAllExpense = async (expenseId: number): Promise<GetExpenseResponse> => {
   const response = await axios.get<GetExpenseResponse>(
-    `http://localhost:8080/v1/expenses/${expenseId}`
+    `${appConfig.API_URL}/v1/expenses/${expenseId}`
   );
   return response.data;
 };
 
 const deleteExpense = async (expenseId: number): Promise<void> => {
-  await axios.delete<void>(`http://localhost:8080/v1/expenses/${expenseId}`);
+  await axios.delete<void>(`${appConfig.API_URL}/v1/expenses/${expenseId}`);
 };
 
 const ExpenseList = () => {
@@ -83,7 +85,7 @@ const ExpenseList = () => {
 
   // Form fields
   const [amount, setAmount] = useState<number | null>(null);
-  const [expenseDate, setExpenseDate] = useState<Date>(new Date());
+  const [expenseDate, setExpenseDate] = useState<Date>(getCurrentLocalDate());
   const [description, setDescription] = useState<string>();
 
   const fetchAllExpenses = () => {
@@ -92,7 +94,7 @@ const ExpenseList = () => {
 
   const resetFormFields = () => {
     setAmount(null);
-    setExpenseDate(new Date());
+    setExpenseDate(getCurrentLocalDate());
     setDescription(undefined);
   };
 
@@ -110,12 +112,15 @@ const ExpenseList = () => {
     if (!expenseDate || !amount || !description) {
       throw new Error('Error...!');
     }
+    console.log('expenseDate', expenseDate);
+    console.log('expenseDate.toISOString()', expenseDate.toISOString());
+    console.log('formatDate(expenseDate)', formatLocalDateToIsoDateString(expenseDate));
     const response = await axios.post<
       CreateExpenseResponse,
       AxiosResponse<CreateExpenseResponse>,
       CreateExpenseRequest
-    >('http://localhost:8080/v1/expenses', {
-      expenseDate: expenseDate.toISOString(),
+    >(`${appConfig.API_URL}/v1/expenses`, {
+      expenseDate: formatLocalDateToIsoDateString(expenseDate),
       amount: amount,
       description: description,
     });
@@ -156,8 +161,8 @@ const ExpenseList = () => {
       UpdateExpenseResponse,
       AxiosResponse<UpdateExpenseResponse>,
       UpdateExpenseRequest
-    >(`http://localhost:8080/v1/expenses/${updatableExpenseId}`, {
-      expenseDate: expenseDate.toISOString(),
+    >(`${appConfig.API_URL}/v1/expenses/${updatableExpenseId}`, {
+      expenseDate: formatLocalDateToIsoDateString(expenseDate),
       amount: amount,
       description: description,
     });
@@ -191,60 +196,116 @@ const ExpenseList = () => {
 
   const actionBodyTemplate = (rowData: Expense) => {
     return (
-      <>
+      <div className="flex gap-2">
         <Button
           icon="pi pi-pencil"
-          className="p-button-warning"
+          className="p-button-rounded p-button-warning p-button-sm"
           onClick={() => openUpdateExpenseDialogBox(rowData.id)}
+          tooltip="Edit"
+          tooltipOptions={{ position: 'top' }}
         />
         <Button
           icon="pi pi-trash"
-          className="p-button-danger"
+          className="p-button-rounded p-button-danger p-button-sm"
           onClick={() => openDeleteConfirmDialog(rowData.id)}
+          tooltip="Delete"
+          tooltipOptions={{ position: 'top' }}
         />
-      </>
+      </div>
     );
   };
 
   return (
-    <div>
-      <Button label="Add Expense" icon="pi pi-plus" onClick={openCreateExpenseDialogBox} />
-      <DataTable value={expenses}>
-        <Column field="id" header="ID"></Column>
-        <Column field="expenseDate" header="Expense date"></Column>
-        <Column field="amount" header="Amount"></Column>
-        <Column field="description" header="Description"></Column>
-        <Column body={actionBodyTemplate}></Column>
-      </DataTable>
+    <>
+      <div className="flex flex-wrap justify-between items-center mb-3 gap-2">
+        <h2 className="m-0 text-lg font-semibold">Expenses</h2>
+        <Button
+          label="Add Expense"
+          icon="pi pi-plus"
+          className="p-button-sm"
+          onClick={openCreateExpenseDialogBox}
+        />
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <DataTable
+          value={expenses}
+          paginator
+          rows={10}
+          rowsPerPageOptions={[5, 10, 20]}
+          className="p-datatable-sm shadow-md rounded-lg"
+          tableStyle={{ minWidth: '900px' }}
+          scrollable
+        >
+          <Column
+            body={actionBodyTemplate}
+            header="Actions"
+            style={{ minWidth: '120px', textAlign: 'center' }}
+            frozen
+          ></Column>
+          <Column field="id" header="ID" style={{ minWidth: '80px' }}></Column>
+          <Column field="expenseDate" header="Expense date" style={{ minWidth: '150px' }}></Column>
+          <Column field="amount" header="Amount" style={{ minWidth: '120px' }}></Column>
+          <Column field="description" header="Description" style={{ minWidth: '200px' }}></Column>
+        </DataTable>
+      </div>
       <ConfirmDialog />
       <Dialog
         header="Create Expense"
         visible={displayCreateExpenseDialogBox}
         onHide={closeCreateExpenseDialogBox}
-      >
-        <form onSubmit={handleCreateExpenseSubmit}>
+        modal
+        style={{ width: '90vw', maxWidth: '500px' }}
+        className="p-fluid"
+        footer={
           <div>
-            <div>
-              <label htmlFor="amount">Amount</label>
-              <InputNumber
-                inputId="amount"
-                value={amount}
-                onValueChange={(e) => setAmount(e.value as number)}
-              />
-            </div>
-            <div>
-              <label htmlFor="expenseDate">Expense date</label>
-              <Calendar value={expenseDate} onChange={(e) => setExpenseDate(e.value as Date)} />
-            </div>
-            <div>
-              <label htmlFor="description">Description</label>
-              <InputTextarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-            <Button label="Save" icon="pi pi-check" type="submit" />
+            <Button type="button" label="Cancel" onClick={closeCreateExpenseDialogBox} />
+            <Button
+              label="Save"
+              icon="pi pi-check"
+              type="submit"
+              form="createExpenseForm"
+              autoFocus
+            />
+          </div>
+        }
+      >
+        <form id="createExpenseForm" onSubmit={handleCreateExpenseSubmit}>
+          <div className="field mb-4">
+            <label htmlFor="createExpenseAmount" className="block mb-2">
+              Amount
+            </label>
+            <InputNumber
+              inputId="createExpenseAmount"
+              value={amount}
+              onValueChange={(e) => setAmount(e.value as number)}
+              className="w-full"
+            />
+          </div>
+          <div className="field mb-4">
+            <label htmlFor="createExpenseDate" className="block mb-2">
+              Expense date
+            </label>
+            <Calendar
+              id="createExpenseDate"
+              value={expenseDate}
+              showIcon
+              onChange={(e) => setExpenseDate(e.value as Date)}
+              className="w-full"
+              dateFormat="yy-mm-dd"
+            />
+          </div>
+          <div className="field mb-4">
+            <label htmlFor="createExpenseDescription" className="block mb-2">
+              Description
+            </label>
+            <InputTextarea
+              id="createExpenseDescription"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              autoResize
+              className="w-full"
+            />
           </div>
         </form>
       </Dialog>
@@ -252,34 +313,63 @@ const ExpenseList = () => {
         header="Update Expense"
         visible={displayUpdateExpenseDialogBox}
         onHide={closeUpdateExpenseDialogBox}
-      >
-        <form onSubmit={handleUpdateExpenseSubmit}>
+        modal
+        style={{ width: '90vw', maxWidth: '500px' }}
+        className="p-fluid"
+        footer={
           <div>
-            <div>
-              <label htmlFor="amount">Amount</label>
-              <InputNumber
-                inputId="amount"
-                value={amount}
-                onValueChange={(e) => setAmount(e.value as number)}
-              />
-            </div>
-            <div>
-              <label htmlFor="expenseDate">Expense date</label>
-              <Calendar value={expenseDate} onChange={(e) => setExpenseDate(e.value as Date)} />
-            </div>
-            <div>
-              <label htmlFor="description">Description</label>
-              <InputTextarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-            <Button label="Save" icon="pi pi-check" type="submit" />
+            <Button type="button" label="Cancel" onClick={closeUpdateExpenseDialogBox} />
+            <Button
+              label="Save"
+              icon="pi pi-check"
+              type="submit"
+              form="updateExpenseForm"
+              autoFocus
+            />
+          </div>
+        }
+      >
+        <form id="updateExpenseForm" onSubmit={handleUpdateExpenseSubmit}>
+          <div className="field mb-4">
+            <label htmlFor="updateExpenseAmount" className="block mb-2">
+              Amount
+            </label>
+            <InputNumber
+              inputId="updateExpenseAmount"
+              value={amount}
+              onValueChange={(e) => setAmount(e.value as number)}
+              className="w-full"
+            />
+          </div>
+          <div className="field mb-4">
+            <label htmlFor="updateExpenseDate" className="block mb-2">
+              Expense date
+            </label>
+            <Calendar
+              id="updateExpenseDate"
+              value={expenseDate}
+              showIcon
+              onChange={(e) => setExpenseDate(e.value as Date)}
+              className="w-full"
+              dateFormat="yy-mm-dd"
+            />
+          </div>
+          <div className="field mb-4">
+            <label htmlFor="updateExpenseDescription" className="block mb-2">
+              Description
+            </label>
+            <InputTextarea
+              id="updateExpenseDescription"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              autoResize
+              className="w-full"
+            />
           </div>
         </form>
       </Dialog>
-    </div>
+    </>
   );
 };
 
