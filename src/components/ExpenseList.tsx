@@ -8,14 +8,23 @@ import { Dialog } from 'primereact/dialog';
 import { InputNumber } from 'primereact/inputnumber';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { useEffect, useState, type FormEvent } from 'react';
-import { formatLocalDateToIsoDateString, getCurrentLocalDate } from '../utils/dateUtils';
+import {
+  formatLocalDateToIsoDateString,
+  getCurrentLocalDate,
+  getLocalDateFromIsoDateString,
+} from '../utils/dateUtils';
 import { appConfig } from '../config/appConfig';
+import { useQuery } from '@tanstack/react-query';
+import { Dropdown } from 'primereact/dropdown';
+import type { SelectItem } from 'primereact/selectitem';
 
 interface Expense {
   id: number;
   expenseDate: string;
   amount: number;
   description: string;
+  expenseCategoryId: number;
+  paymentModeId: number;
 }
 
 interface GetAllExpensesResponse {
@@ -27,12 +36,16 @@ interface GetExpenseResponse {
   expenseDate: string;
   amount: number;
   description: string;
+  expenseCategoryId: number;
+  paymentModeId: number;
 }
 
 interface CreateExpenseRequest {
   expenseDate: string;
   amount: number;
   description: string;
+  expenseCategoryId: number;
+  paymentModeId: number;
 }
 
 interface CreateExpenseResponse {
@@ -40,12 +53,16 @@ interface CreateExpenseResponse {
   expenseDate: string;
   amount: number;
   description: string;
+  expenseCategoryId: number;
+  paymentModeId: number;
 }
 
 interface UpdateExpenseRequest {
   expenseDate: string;
   amount: number;
   description: string;
+  expenseCategoryId: number;
+  paymentModeId: number;
 }
 
 interface UpdateExpenseResponse {
@@ -53,6 +70,26 @@ interface UpdateExpenseResponse {
   expenseDate: string;
   amount: number;
   description: string;
+  expenseCategoryId: number;
+  paymentModeId: number;
+}
+
+interface ExpenseCategory {
+  id: number;
+  name: string;
+}
+
+interface GetExpenseCategoriesResponse {
+  expenseCategories: ExpenseCategory[];
+}
+
+interface PaymentMode {
+  id: number;
+  name: string;
+}
+
+interface GetPaymentModesResponse {
+  paymentModes: PaymentMode[];
 }
 
 const getAllExpenses = async (): Promise<GetAllExpensesResponse> => {
@@ -87,6 +124,54 @@ const ExpenseList = () => {
   const [amount, setAmount] = useState<number | null>(null);
   const [expenseDate, setExpenseDate] = useState<Date>(getCurrentLocalDate());
   const [description, setDescription] = useState<string>();
+  const [expenseCategoryId, setExpenseCategoryId] = useState<number | null>(null);
+  const [paymentModeId, setPaymentModeId] = useState<number | null>(null);
+
+  const { data: expenseCategories, isLoading: expenseCategoriesLoading } = useQuery({
+    queryKey: ['expenseCategories'],
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    queryFn: () =>
+      axios
+        .get<GetExpenseCategoriesResponse>(`${appConfig.API_URL}/v1/expense-categories`)
+        .then((response) => response.data.expenseCategories),
+  });
+  const { data: paymentModes, isLoading: paymentModesLoading } = useQuery({
+    queryKey: ['paymentModes'],
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    queryFn: () =>
+      axios
+        .get<GetPaymentModesResponse>(`${appConfig.API_URL}/v1/payment-modes`)
+        .then((response) => response.data.paymentModes),
+  });
+
+  const expenseCategoriesMap: Record<number, ExpenseCategory> = {};
+  const expenseCategoryDropdownOptions: SelectItem[] = [];
+  if (expenseCategories) {
+    expenseCategories.forEach((expenseCategory) => {
+      expenseCategoriesMap[expenseCategory.id] = expenseCategory;
+      expenseCategoryDropdownOptions.push({
+        value: expenseCategory.id,
+        label: expenseCategory.name,
+      });
+    });
+  }
+
+  const paymentModesMap: Record<number, PaymentMode> = {};
+  const paymentModeDropdownOptions: SelectItem[] = [];
+  if (paymentModes) {
+    paymentModes.forEach((paymentMode) => {
+      paymentModesMap[paymentMode.id] = paymentMode;
+      paymentModeDropdownOptions.push({ value: paymentMode.id, label: paymentMode.name });
+    });
+  }
 
   const fetchAllExpenses = () => {
     getAllExpenses().then((response) => setExpenses(response.expenses));
@@ -96,6 +181,8 @@ const ExpenseList = () => {
     setAmount(null);
     setExpenseDate(getCurrentLocalDate());
     setDescription(undefined);
+    setExpenseCategoryId(null);
+    setPaymentModeId(null);
   };
 
   // Create expense functions
@@ -109,7 +196,7 @@ const ExpenseList = () => {
   };
 
   const createExpense = async (): Promise<CreateExpenseResponse> => {
-    if (!expenseDate || !amount || !description) {
+    if (!expenseDate || !amount || !description || !expenseCategoryId || !paymentModeId) {
       throw new Error('Error...!');
     }
     const response = await axios.post<
@@ -120,6 +207,8 @@ const ExpenseList = () => {
       expenseDate: formatLocalDateToIsoDateString(expenseDate),
       amount: amount,
       description: description,
+      expenseCategoryId: expenseCategoryId,
+      paymentModeId: paymentModeId,
     });
     return response.data;
   };
@@ -144,14 +233,23 @@ const ExpenseList = () => {
     setUpdatableExpenseId(expenseId);
     getAllExpense(expenseId).then((response) => {
       setAmount(response.amount);
-      setExpenseDate(new Date(response.expenseDate));
+      setExpenseDate(getLocalDateFromIsoDateString(response.expenseDate));
       setDescription(response.description);
+      setExpenseCategoryId(response.expenseCategoryId);
+      setPaymentModeId(response.paymentModeId);
       setDisplayUpdateExpenseDialogBox(true);
     });
   };
 
   const updateExpense = async (): Promise<UpdateExpenseResponse> => {
-    if (!expenseDate || !amount || !description || !updatableExpenseId) {
+    if (
+      !expenseDate ||
+      !amount ||
+      !description ||
+      !updatableExpenseId ||
+      !expenseCategoryId ||
+      !paymentModeId
+    ) {
       throw new Error('Error...!');
     }
     const response = await axios.put<
@@ -162,6 +260,8 @@ const ExpenseList = () => {
       expenseDate: formatLocalDateToIsoDateString(expenseDate),
       amount: amount,
       description: description,
+      expenseCategoryId: expenseCategoryId,
+      paymentModeId: paymentModeId,
     });
     return response.data;
   };
@@ -212,6 +312,10 @@ const ExpenseList = () => {
     );
   };
 
+  if (expenseCategoriesLoading || paymentModesLoading) {
+    return 'Loading...!';
+  }
+
   return (
     <>
       <div className="flex flex-wrap justify-between items-center mb-3 gap-2">
@@ -242,6 +346,26 @@ const ExpenseList = () => {
           <Column field="id" header="ID" style={{ minWidth: '80px' }}></Column>
           <Column field="expenseDate" header="Expense date" style={{ minWidth: '150px' }}></Column>
           <Column field="amount" header="Amount" style={{ minWidth: '120px' }}></Column>
+          <Column
+            header="Expense category"
+            style={{ minWidth: '120px' }}
+            body={(rowData: Expense) => {
+              if (!expenseCategoriesMap && !expenseCategoriesMap[rowData.expenseCategoryId]) {
+                return null;
+              }
+              return expenseCategoriesMap[rowData.expenseCategoryId].name;
+            }}
+          ></Column>
+          <Column
+            header="Payment mode"
+            style={{ minWidth: '120px' }}
+            body={(rowData: Expense) => {
+              if (!paymentModesMap && !paymentModesMap[rowData.paymentModeId]) {
+                return null;
+              }
+              return paymentModesMap[rowData.paymentModeId].name;
+            }}
+          ></Column>
           <Column field="description" header="Description" style={{ minWidth: '200px' }}></Column>
         </DataTable>
       </div>
@@ -304,6 +428,30 @@ const ExpenseList = () => {
               className="w-full"
             />
           </div>
+          <div className="field mb-4">
+            <label htmlFor="createExpenseCategory" className="block mb-2">
+              Expense category
+            </label>
+            <Dropdown
+              id="createExpenseCategory"
+              value={expenseCategoryId}
+              options={expenseCategoryDropdownOptions}
+              onChange={(e) => setExpenseCategoryId(e.value)}
+              className="w-full"
+            />
+          </div>
+          <div className="field mb-4">
+            <label htmlFor="createExpensePaymentMode" className="block mb-2">
+              Payment mode
+            </label>
+            <Dropdown
+              id="createExpensePaymentMode"
+              value={paymentModeId}
+              options={paymentModeDropdownOptions}
+              onChange={(e) => setPaymentModeId(e.value)}
+              className="w-full"
+            />
+          </div>
         </form>
       </Dialog>
       <Dialog
@@ -361,6 +509,30 @@ const ExpenseList = () => {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               autoResize
+              className="w-full"
+            />
+          </div>
+          <div className="field mb-4">
+            <label htmlFor="updateExpenseCategory" className="block mb-2">
+              Expense category
+            </label>
+            <Dropdown
+              id="updateExpenseCategory"
+              value={expenseCategoryId}
+              options={expenseCategoryDropdownOptions}
+              onChange={(e) => setExpenseCategoryId(e.value)}
+              className="w-full"
+            />
+          </div>
+          <div className="field mb-4">
+            <label htmlFor="updateExpensePaymentMode" className="block mb-2">
+              Payment mode
+            </label>
+            <Dropdown
+              id="updateExpensePaymentMode"
+              value={paymentModeId}
+              options={paymentModeDropdownOptions}
+              onChange={(e) => setPaymentModeId(e.value)}
               className="w-full"
             />
           </div>
