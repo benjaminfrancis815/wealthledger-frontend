@@ -112,9 +112,6 @@ const ExpenseList = () => {
     if (!expenseDate || !amount || !description) {
       throw new Error('Error...!');
     }
-    console.log('expenseDate', expenseDate);
-    console.log('expenseDate.toISOString()', expenseDate.toISOString());
-    console.log('formatDate(expenseDate)', formatLocalDateToIsoDateString(expenseDate));
     const response = await axios.post<
       CreateExpenseResponse,
       AxiosResponse<CreateExpenseResponse>,
