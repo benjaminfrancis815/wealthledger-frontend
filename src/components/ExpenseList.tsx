@@ -1,22 +1,22 @@
-import axios, { type AxiosResponse } from 'axios';
+import { useQuery } from '@tanstack/react-query';
+import { type AxiosResponse } from 'axios';
 import { Button } from 'primereact/button';
 import { Calendar } from 'primereact/calendar';
 import { Column } from 'primereact/column';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { DataTable } from 'primereact/datatable';
 import { Dialog } from 'primereact/dialog';
+import { Dropdown } from 'primereact/dropdown';
 import { InputNumber } from 'primereact/inputnumber';
 import { InputTextarea } from 'primereact/inputtextarea';
+import type { SelectItem } from 'primereact/selectitem';
 import { useEffect, useState, type FormEvent } from 'react';
+import api from '../api/api';
 import {
   formatLocalDateToIsoDateString,
   getCurrentLocalDate,
   getLocalDateFromIsoDateString,
 } from '../utils/dateUtils';
-import { appConfig } from '../config/appConfig';
-import { useQuery } from '@tanstack/react-query';
-import { Dropdown } from 'primereact/dropdown';
-import type { SelectItem } from 'primereact/selectitem';
 
 interface Expense {
   id: number;
@@ -93,19 +93,17 @@ interface GetPaymentModesResponse {
 }
 
 const getAllExpenses = async (): Promise<GetAllExpensesResponse> => {
-  const response = await axios.get<GetAllExpensesResponse>(`${appConfig.API_URL}/v1/expenses`);
+  const response = await api.get<GetAllExpensesResponse>('/v1/expenses');
   return response.data;
 };
 
 const getAllExpense = async (expenseId: number): Promise<GetExpenseResponse> => {
-  const response = await axios.get<GetExpenseResponse>(
-    `${appConfig.API_URL}/v1/expenses/${expenseId}`
-  );
+  const response = await api.get<GetExpenseResponse>(`/v1/expenses/${expenseId}`);
   return response.data;
 };
 
 const deleteExpense = async (expenseId: number): Promise<void> => {
-  await axios.delete<void>(`${appConfig.API_URL}/v1/expenses/${expenseId}`);
+  await api.delete<void>(`/v1/expenses/${expenseId}`);
 };
 
 const ExpenseList = () => {
@@ -135,8 +133,8 @@ const ExpenseList = () => {
     refetchOnReconnect: false,
     refetchOnMount: false,
     queryFn: () =>
-      axios
-        .get<GetExpenseCategoriesResponse>(`${appConfig.API_URL}/v1/expense-categories`)
+      api
+        .get<GetExpenseCategoriesResponse>("/v1/expense-categories")
         .then((response) => response.data.expenseCategories),
   });
   const { data: paymentModes, isLoading: paymentModesLoading } = useQuery({
@@ -147,8 +145,8 @@ const ExpenseList = () => {
     refetchOnReconnect: false,
     refetchOnMount: false,
     queryFn: () =>
-      axios
-        .get<GetPaymentModesResponse>(`${appConfig.API_URL}/v1/payment-modes`)
+      api
+        .get<GetPaymentModesResponse>("/v1/payment-modes")
         .then((response) => response.data.paymentModes),
   });
 
@@ -199,11 +197,11 @@ const ExpenseList = () => {
     if (!expenseDate || !amount || !description || !expenseCategoryId || !paymentModeId) {
       throw new Error('Error...!');
     }
-    const response = await axios.post<
+    const response = await api.post<
       CreateExpenseResponse,
       AxiosResponse<CreateExpenseResponse>,
       CreateExpenseRequest
-    >(`${appConfig.API_URL}/v1/expenses`, {
+    >("/v1/expenses", {
       expenseDate: formatLocalDateToIsoDateString(expenseDate),
       amount: amount,
       description: description,
@@ -252,11 +250,11 @@ const ExpenseList = () => {
     ) {
       throw new Error('Error...!');
     }
-    const response = await axios.put<
+    const response = await api.put<
       UpdateExpenseResponse,
       AxiosResponse<UpdateExpenseResponse>,
       UpdateExpenseRequest
-    >(`${appConfig.API_URL}/v1/expenses/${updatableExpenseId}`, {
+    >(`/v1/expenses/${updatableExpenseId}`, {
       expenseDate: formatLocalDateToIsoDateString(expenseDate),
       amount: amount,
       description: description,
