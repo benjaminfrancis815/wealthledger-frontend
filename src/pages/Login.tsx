@@ -6,7 +6,7 @@ import { Password } from 'primereact/password';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
-import { setToken } from '../utils/authUtils';
+import { clearToken, setToken } from '../utils/authUtils';
 
 interface LoginRequest {
   username: string;
@@ -27,6 +27,7 @@ const Login = () => {
     if (!username || !password) {
       throw new Error('Error...!');
     }
+    clearToken();
     const response = await api.post<LoginResponse, AxiosResponse<LoginResponse>, LoginRequest>(
       '/v1/auth/login',
       {
