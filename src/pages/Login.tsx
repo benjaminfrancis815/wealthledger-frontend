@@ -20,8 +20,8 @@ interface LoginResponse {
 const Login = () => {
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState<string>();
-  const [password, setPassword] = useState<string>();
+  const [username, setUsername] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
 
   const login = async (): Promise<LoginResponse> => {
     if (!username || !password) {

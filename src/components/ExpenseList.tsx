@@ -121,7 +121,7 @@ const ExpenseList = () => {
   // Form fields
   const [amount, setAmount] = useState<number | null>(null);
   const [expenseDate, setExpenseDate] = useState<Date>(getCurrentLocalDate());
-  const [description, setDescription] = useState<string>();
+  const [description, setDescription] = useState<string>('');
   const [expenseCategoryId, setExpenseCategoryId] = useState<number | null>(null);
   const [paymentModeId, setPaymentModeId] = useState<number | null>(null);
 
@@ -134,7 +134,7 @@ const ExpenseList = () => {
     refetchOnMount: false,
     queryFn: () =>
       api
-        .get<GetExpenseCategoriesResponse>("/v1/expense-categories")
+        .get<GetExpenseCategoriesResponse>('/v1/expense-categories')
         .then((response) => response.data.expenseCategories),
   });
   const { data: paymentModes, isLoading: paymentModesLoading } = useQuery({
@@ -146,7 +146,7 @@ const ExpenseList = () => {
     refetchOnMount: false,
     queryFn: () =>
       api
-        .get<GetPaymentModesResponse>("/v1/payment-modes")
+        .get<GetPaymentModesResponse>('/v1/payment-modes')
         .then((response) => response.data.paymentModes),
   });
 
@@ -178,7 +178,7 @@ const ExpenseList = () => {
   const resetFormFields = () => {
     setAmount(null);
     setExpenseDate(getCurrentLocalDate());
-    setDescription(undefined);
+    setDescription('');
     setExpenseCategoryId(null);
     setPaymentModeId(null);
   };
@@ -201,7 +201,7 @@ const ExpenseList = () => {
       CreateExpenseResponse,
       AxiosResponse<CreateExpenseResponse>,
       CreateExpenseRequest
-    >("/v1/expenses", {
+    >('/v1/expenses', {
       expenseDate: formatLocalDateToIsoDateString(expenseDate),
       amount: amount,
       description: description,
