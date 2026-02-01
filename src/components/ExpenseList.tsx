@@ -15,7 +15,10 @@ import api from '../api/api';
 import {
   formatLocalDateToIsoDateString,
   getCurrentLocalDate,
+  getEndOfMonthLocalDate,
   getLocalDateFromIsoDateString,
+  getStartOfCurrentMonthLocalDate,
+  getStartOfMonthLocalDate
 } from '../utils/dateUtils';
 
 interface Expense {
@@ -92,8 +95,13 @@ interface GetPaymentModesResponse {
   paymentModes: PaymentMode[];
 }
 
-const getAllExpenses = async (): Promise<GetAllExpensesResponse> => {
-  const response = await api.get<GetAllExpensesResponse>('/v1/expenses');
+const getAllExpenses = async (expenseMonth: Date): Promise<GetAllExpensesResponse> => {
+  const response = await api.get<GetAllExpensesResponse>('/v1/expenses', {
+    params: {
+      expenseStartDate: formatLocalDateToIsoDateString(getStartOfMonthLocalDate(expenseMonth)),
+      expenseEndDate: formatLocalDateToIsoDateString(getEndOfMonthLocalDate(expenseMonth)),
+    },
+  });
   return response.data;
 };
 
@@ -108,6 +116,8 @@ const deleteExpense = async (expenseId: number): Promise<void> => {
 
 const ExpenseList = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+
+  const [expenseMonth, setExpenseMonth] = useState<Date>(getStartOfCurrentMonthLocalDate());
 
   // Create expense state
   const [displayCreateExpenseDialogBox, setDisplayCreateExpenseDialogBox] =
@@ -172,7 +182,7 @@ const ExpenseList = () => {
   }
 
   const fetchAllExpenses = () => {
-    getAllExpenses().then((response) => setExpenses(response.expenses));
+    getAllExpenses(expenseMonth).then((response) => setExpenses(response.expenses));
   };
 
   const resetFormFields = () => {
@@ -274,7 +284,7 @@ const ExpenseList = () => {
 
   useEffect(() => {
     fetchAllExpenses();
-  }, []);
+  }, [expenseMonth.getTime()]);
 
   const openDeleteConfirmDialog = (expenseId: number) => {
     confirmDialog({
@@ -324,6 +334,15 @@ const ExpenseList = () => {
           className="p-button-sm"
           onClick={openCreateExpenseDialogBox}
         />
+        <Calendar
+          showIcon
+          value={expenseMonth}
+          className="p-calendar-sm"
+          onChange={(e) => setExpenseMonth(e.value as Date)}
+          view="month"
+          dateFormat="MM yy"
+          readOnlyInput
+        />
       </div>
       <div style={{ overflowX: 'auto' }}>
         <DataTable
@@ -342,7 +361,7 @@ const ExpenseList = () => {
             frozen
           ></Column>
           <Column field="id" header="ID" style={{ minWidth: '80px' }}></Column>
-          <Column field="expenseDate" header="Expense date" style={{ minWidth: '150px' }}></Column>
+          <Column field="expenseDate" header="Expense date"></Column>
           <Column field="amount" header="Amount" style={{ minWidth: '120px' }}></Column>
           <Column
             header="Expense category"
