@@ -105,7 +105,7 @@ const getAllExpenses = async (expenseMonth: Date): Promise<GetAllExpensesRespons
   return response.data;
 };
 
-const getAllExpense = async (expenseId: number): Promise<GetExpenseResponse> => {
+const getExpense = async (expenseId: number): Promise<GetExpenseResponse> => {
   const response = await api.get<GetExpenseResponse>(`/v1/expenses/${expenseId}`);
   return response.data;
 };
@@ -239,7 +239,7 @@ const ExpenseList = () => {
   const openUpdateExpenseDialogBox = (expenseId: number) => {
     resetFormFields();
     setUpdatableExpenseId(expenseId);
-    getAllExpense(expenseId).then((response) => {
+    getExpense(expenseId).then((response) => {
       setAmount(response.amount);
       setExpenseDate(getLocalDateFromIsoDateString(response.expenseDate));
       setDescription(response.description);
