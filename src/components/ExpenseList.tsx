@@ -18,7 +18,7 @@ import {
   getEndOfMonthLocalDate,
   getLocalDateFromIsoDateString,
   getStartOfCurrentMonthLocalDate,
-  getStartOfMonthLocalDate
+  getStartOfMonthLocalDate,
 } from '../utils/dateUtils';
 
 interface Expense {
@@ -28,6 +28,7 @@ interface Expense {
   description: string;
   expenseCategoryId: number;
   paymentModeId: number;
+  expenseBookId: number;
 }
 
 interface GetAllExpensesResponse {
@@ -41,6 +42,7 @@ interface GetExpenseResponse {
   description: string;
   expenseCategoryId: number;
   paymentModeId: number;
+  expenseBookId: number;
 }
 
 interface CreateExpenseRequest {
@@ -49,6 +51,7 @@ interface CreateExpenseRequest {
   description: string;
   expenseCategoryId: number;
   paymentModeId: number;
+  expenseBookId: number;
 }
 
 interface CreateExpenseResponse {
@@ -58,6 +61,7 @@ interface CreateExpenseResponse {
   description: string;
   expenseCategoryId: number;
   paymentModeId: number;
+  expenseBookId: number;
 }
 
 interface UpdateExpenseRequest {
@@ -66,6 +70,7 @@ interface UpdateExpenseRequest {
   description: string;
   expenseCategoryId: number;
   paymentModeId: number;
+  expenseBookId: number;
 }
 
 interface UpdateExpenseResponse {
@@ -75,6 +80,7 @@ interface UpdateExpenseResponse {
   description: string;
   expenseCategoryId: number;
   paymentModeId: number;
+  expenseBookId: number;
 }
 
 interface ExpenseCategory {
@@ -95,11 +101,24 @@ interface GetPaymentModesResponse {
   paymentModes: PaymentMode[];
 }
 
-const getAllExpenses = async (expenseMonth: Date): Promise<GetAllExpensesResponse> => {
+interface ExpenseBook {
+  id: number;
+  name: string;
+}
+
+interface GetExpenseBooksResponse {
+  expenseBooks: ExpenseBook[];
+}
+
+const getAllExpenses = async (
+  expenseMonth: Date,
+  expenseBookId: number
+): Promise<GetAllExpensesResponse> => {
   const response = await api.get<GetAllExpensesResponse>('/v1/expenses', {
     params: {
       expenseStartDate: formatLocalDateToIsoDateString(getStartOfMonthLocalDate(expenseMonth)),
       expenseEndDate: formatLocalDateToIsoDateString(getEndOfMonthLocalDate(expenseMonth)),
+      expenseBookId: expenseBookId,
     },
   });
   return response.data;
@@ -118,6 +137,8 @@ const ExpenseList = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const [expenseMonth, setExpenseMonth] = useState<Date>(getStartOfCurrentMonthLocalDate());
+
+  const [expenseBookId, setExpenseBookId] = useState<number | null>(null);
 
   // Create expense state
   const [displayCreateExpenseDialogBox, setDisplayCreateExpenseDialogBox] =
@@ -147,6 +168,7 @@ const ExpenseList = () => {
         .get<GetExpenseCategoriesResponse>('/v1/expense-categories')
         .then((response) => response.data.expenseCategories),
   });
+
   const { data: paymentModes, isLoading: paymentModesLoading } = useQuery({
     queryKey: ['paymentModes'],
     staleTime: Infinity,
@@ -158,6 +180,19 @@ const ExpenseList = () => {
       api
         .get<GetPaymentModesResponse>('/v1/payment-modes')
         .then((response) => response.data.paymentModes),
+  });
+
+  const { data: expenseBooks, isLoading: expenseBooksLoading } = useQuery({
+    queryKey: ['expenseBooks'],
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    queryFn: () =>
+      api
+        .get<GetExpenseBooksResponse>('/v1/expense-books')
+        .then((response) => response.data.expenseBooks),
   });
 
   const expenseCategoriesMap: Record<number, ExpenseCategory> = {};
@@ -181,8 +216,23 @@ const ExpenseList = () => {
     });
   }
 
+  const expenseBooksMap: Record<number, ExpenseBook> = {};
+  const expenseBookDropdownOptions: SelectItem[] = [];
+  if (expenseBooks) {
+    expenseBooks.forEach((expenseBook) => {
+      expenseBooksMap[expenseBook.id] = expenseBook;
+      expenseBookDropdownOptions.push({
+        value: expenseBook.id,
+        label: expenseBook.name,
+      });
+    });
+  }
+
   const fetchAllExpenses = () => {
-    getAllExpenses(expenseMonth).then((response) => setExpenses(response.expenses));
+    expenseBookId &&
+      getAllExpenses(expenseMonth, expenseBookId).then((response) =>
+        setExpenses(response.expenses)
+      );
   };
 
   const resetFormFields = () => {
@@ -204,7 +254,14 @@ const ExpenseList = () => {
   };
 
   const createExpense = async (): Promise<CreateExpenseResponse> => {
-    if (!expenseDate || !amount || !description || !expenseCategoryId || !paymentModeId) {
+    if (
+      !expenseDate ||
+      !amount ||
+      !description ||
+      !expenseCategoryId ||
+      !paymentModeId ||
+      !expenseBookId
+    ) {
       throw new Error('Error...!');
     }
     const response = await api.post<
@@ -217,6 +274,7 @@ const ExpenseList = () => {
       description: description,
       expenseCategoryId: expenseCategoryId,
       paymentModeId: paymentModeId,
+      expenseBookId: expenseBookId,
     });
     return response.data;
   };
@@ -256,7 +314,8 @@ const ExpenseList = () => {
       !description ||
       !updatableExpenseId ||
       !expenseCategoryId ||
-      !paymentModeId
+      !paymentModeId ||
+      !expenseBookId
     ) {
       throw new Error('Error...!');
     }
@@ -270,6 +329,7 @@ const ExpenseList = () => {
       description: description,
       expenseCategoryId: expenseCategoryId,
       paymentModeId: paymentModeId,
+      expenseBookId: expenseBookId,
     });
     return response.data;
   };
@@ -284,7 +344,7 @@ const ExpenseList = () => {
 
   useEffect(() => {
     fetchAllExpenses();
-  }, [expenseMonth.getTime()]);
+  }, [expenseMonth.getTime(), expenseBookId]);
 
   const openDeleteConfirmDialog = (expenseId: number) => {
     confirmDialog({
@@ -320,29 +380,33 @@ const ExpenseList = () => {
     );
   };
 
-  if (expenseCategoriesLoading || paymentModesLoading) {
+  if (expenseCategoriesLoading || paymentModesLoading || expenseBooksLoading) {
     return 'Loading...!';
   }
 
   return (
     <>
-      <div className="flex flex-wrap justify-between items-center mb-3 gap-2">
-        <h2 className="m-0 text-lg font-semibold">Expenses</h2>
-        <Button
-          label="Add Expense"
-          icon="pi pi-plus"
-          className="p-button-sm"
-          onClick={openCreateExpenseDialogBox}
-        />
-        <Calendar
-          showIcon
-          value={expenseMonth}
-          className="p-calendar-sm"
-          onChange={(e) => setExpenseMonth(e.value as Date)}
-          view="month"
-          dateFormat="MM yy"
-          readOnlyInput
-        />
+      <div className="mb-3">
+        <h1 className="m-0 text-xl font-semibold mb-2">Expenses</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button label="Add" icon="pi pi-plus" size="small" onClick={openCreateExpenseDialogBox} />
+          <Calendar
+            value={expenseMonth}
+            onChange={(e) => setExpenseMonth(e.value as Date)}
+            view="month"
+            dateFormat="MM yy"
+            showIcon
+            readOnlyInput
+            inputClassName="p-inputtext-sm"
+          />
+          <Dropdown
+            value={expenseBookId}
+            options={expenseBookDropdownOptions}
+            onChange={(e) => setExpenseBookId(e.value)}
+            placeholder="Expense Book"
+            className="p-inputtext-sm min-w-[10rem]"
+          />
+        </div>
       </div>
       <div style={{ overflowX: 'auto' }}>
         <DataTable
